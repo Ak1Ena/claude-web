@@ -394,21 +394,23 @@
 
   async function processFile(file) {
     const heic = isHeic(file);
-
-    // For HEIC: convert to JPEG via heic2any for preview only
-    // For JPEG: use FileReader data URL
     let previewSrc = null;
 
     if (heic) {
       showBadge('⏳ Loading HEIC…');
       try {
-        // Dynamically load heic2any only when needed
         await loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
-        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+        // Convert HEIC to JPEG for browser preview
+        const blob = await heic2any({ 
+          blob: file, 
+          toType: 'image/jpeg', 
+          quality: 0.7 
+        });
         const jpegBlob = Array.isArray(blob) ? blob[0] : blob;
         previewSrc = URL.createObjectURL(jpegBlob);
       } catch(e) {
-        // If heic2any fails, show placeholder
+        console.error('HEIC conversion error:', e);
+        // Fallback or show error
         previewSrc = null;
       }
       removeBadge();
@@ -425,6 +427,7 @@
       img.src = previewSrc;
       img.style.display = 'block';
     } else {
+      // If we can't show a preview, at least show the card with file info
       img.style.display = 'none';
     }
 
@@ -435,7 +438,7 @@
       results.style.display = 'block';
     });
 
-    // Always read metadata from raw binary — works for both HEIC and JPEG
+    // Metadata extraction remains the same (handles raw binary)
     if (heic) showBadge('📷 Reading metadata…');
     try {
       const buf  = await file.arrayBuffer();
@@ -444,7 +447,7 @@
       renderMetaFromTags(tags || {}, file, tags ? (tags._rawCount || 0) : 0);
     } catch(e) {
       removeBadge();
-      console.error(e);
+      console.error('Metadata extraction error:', e);
       renderMetaFromTags({}, file, 0);
     }
   }
