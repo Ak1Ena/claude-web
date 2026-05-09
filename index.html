@@ -678,7 +678,7 @@
       attributionControl: true
     });
 
-    // OpenStreetMap tiles via Leaflet (much more reliable than raw iframe)
+    // OpenStreetMap tiles via Leaflet
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19
@@ -719,8 +719,11 @@
 
     leafletMarker.bindPopup(popupContent, { maxWidth: 240 }).openPopup();
 
-    // Fit map nicely
-    leafletMap.invalidateSize();
+    // Ensure map is correctly centered and sized
+    setTimeout(() => {
+      leafletMap.invalidateSize();
+      leafletMap.setView([lat, lon], 15);
+    }, 100);
   }
 
   // Icon helpers
