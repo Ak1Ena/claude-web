@@ -392,46 +392,62 @@
   }
   function removeBadge() { const b = document.getElementById('status-badge'); if (b) b.remove(); }
 
-async function processFile(file) {
-  const heic = isHeic(file);
-  let previewSrc = null;
+  async function processFile(file) {
+    const heic = isHeic(file);
 
-  if (!heic) {
-    previewSrc = await new Promise(res => {
-      const reader = new FileReader();
-      reader.onload = e => res(e.target.result);
-      reader.readAsDataURL(file);
+    // For HEIC: convert to JPEG via heic2any for preview only
+    // For JPEG: use FileReader data URL
+    let previewSrc = null;
+
+    if (heic) {
+      showBadge('⏳ Loading HEIC…');
+      try {
+        // Dynamically load heic2any only when needed
+        await loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
+        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+        const jpegBlob = Array.isArray(blob) ? blob[0] : blob;
+        previewSrc = URL.createObjectURL(jpegBlob);
+      } catch(e) {
+        // If heic2any fails, show placeholder
+        previewSrc = null;
+      }
+      removeBadge();
+    } else {
+      previewSrc = await new Promise(res => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const img = document.getElementById('preview-img');
+    if (previewSrc) {
+      img.src = previewSrc;
+      img.style.display = 'block';
+    } else {
+      img.style.display = 'none';
+    }
+
+    animateLoad(() => {
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-size').textContent = fmtSize(file.size) + '  ·  ' + (file.type || (heic ? 'image/heic' : 'image/jpeg'));
+      dropZone.style.display = 'none';
+      results.style.display = 'block';
     });
-  }
 
-  const img = document.getElementById('preview-img');
-  if (previewSrc) {
-    img.src = previewSrc;
-    img.style.display = 'block';
-  } else {
-    img.style.display = 'none';
+    // Always read metadata from raw binary — works for both HEIC and JPEG
+    if (heic) showBadge('📷 Reading metadata…');
+    try {
+      const buf  = await file.arrayBuffer();
+      const tags = parseTiffExif(buf);
+      removeBadge();
+      renderMetaFromTags(tags || {}, file, tags ? (tags._rawCount || 0) : 0);
+    } catch(e) {
+      removeBadge();
+      console.error(e);
+      renderMetaFromTags({}, file, 0);
+    }
   }
-
-  animateLoad(() => {
-    document.getElementById('file-name').textContent = file.name;
-    document.getElementById('file-size').textContent = fmtSize(file.size) + '  ·  ' + (file.type || (heic ? 'image/heic' : 'image/jpeg'));
-    dropZone.style.display = 'none';
-    results.style.display = 'block';
-  });
-
-  // Read metadata from raw binary (works for both HEIC and JPEG)
-  if (heic) showBadge('📷 Reading metadata…');
-  try {
-    const buf  = await file.arrayBuffer();
-    const tags = parseTiffExif(buf);
-    removeBadge();
-    renderMetaFromTags(tags || {}, file, tags ? (tags._rawCount || 0) : 0);
-  } catch(e) {
-    removeBadge();
-    console.error(e);
-    renderMetaFromTags({}, file, 0);
-  }
-}
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
