@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -391,30 +392,31 @@
     document.body.appendChild(b);
   }
   function removeBadge() { const b = document.getElementById('status-badge'); if (b) b.remove(); }
+async function processFile(file) {
+  const heic = isHeic(file);
+  let previewSrc = null;
 
-  async function processFile(file) {
-    const heic = isHeic(file);
-    let previewSrc = null;
+  if (heic) {
+    showBadge('⏳ Converting HEIC…');
+    console.log('Starting HEIC conversion for:', file.name);
+    try {
+      // heic2any is now pre-loaded in the head
+      const result = await heic2any({ 
+        blob: file, 
+        toType: 'image/jpeg', 
+        quality: 0.6 
+      });
 
-    if (heic) {
-      showBadge('⏳ Loading HEIC…');
-      try {
-        await loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
-        // Convert HEIC to JPEG for browser preview
-        const blob = await heic2any({ 
-          blob: file, 
-          toType: 'image/jpeg', 
-          quality: 0.7 
-        });
-        const jpegBlob = Array.isArray(blob) ? blob[0] : blob;
-        previewSrc = URL.createObjectURL(jpegBlob);
-      } catch(e) {
-        console.error('HEIC conversion error:', e);
-        // Fallback or show error
-        previewSrc = null;
-      }
-      removeBadge();
-    } else {
+      const blob = Array.isArray(result) ? result[0] : result;
+      previewSrc = URL.createObjectURL(blob);
+      console.log('HEIC conversion successful');
+    } catch(e) {
+      console.error('HEIC conversion failed:', e);
+      // Fallback: don't set previewSrc, which will hide the image but show metadata
+    }
+    removeBadge();
+  } else {
+...
       previewSrc = await new Promise(res => {
         const reader = new FileReader();
         reader.onload = e => res(e.target.result);
